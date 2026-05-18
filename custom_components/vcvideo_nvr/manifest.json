@@ -3,7 +3,7 @@
   "name": "VCVideo NVR",
   "icon": "icon.png",
   "version": "1.0.0",
-  "min_homeassistant_version": "2023.1.0",
+  "min_homeassistant_version": "2026.5.0",
   "codeowners": [],
   "requirements": [],
   "dependencies": [],

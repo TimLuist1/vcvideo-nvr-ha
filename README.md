@@ -12,6 +12,8 @@ Alle Kamera-Kanäle des NVR werden automatisch als `camera`-Entitäten in Home A
 
 > **Hinweis:** Diese Integration kommuniziert über die lokale HTTP-API des NVR (Port 80/554) und benötigt keine Cloud-Verbindung.
 
+**Mindestanforderung:** Home Assistant **2026.5.0** oder neuer (aktuelle Version: 2026.5.2)
+
 ---
 
 ## Features
