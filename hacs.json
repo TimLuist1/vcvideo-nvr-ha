@@ -2,5 +2,6 @@
   "name": "VCVideo NVR",
   "render_readme": true,
   "homeassistant": "2026.5.0",
-  "filename": "vcvideo_nvr.zip"
+  "hacs": "2.0.0",
+  "country": ["DE", "AT", "CH"]
 }

@@ -6,6 +6,9 @@
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
 [![GitHub release](https://img.shields.io/github/v/release/TimLuist1/vcvideo-nvr-ha)](https://github.com/TimLuist1/vcvideo-nvr-ha/releases)
+[![Validate](https://github.com/TimLuist1/vcvideo-nvr-ha/actions/workflows/validate.yml/badge.svg)](https://github.com/TimLuist1/vcvideo-nvr-ha/actions/workflows/validate.yml)
+
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=TimLuist1&repository=vcvideo-nvr-ha&category=integration)
 
 Unofficial **Home Assistant** integration for **VCVideo NVR** recorders (developed by [VC Germany](https://vcgermany.de)).  
 Alle Kamera-Kanäle des NVR werden automatisch als `camera`-Entitäten in Home Assistant eingebunden – einschließlich der Kameras, die **nur am NVR** verfügbar sind und nicht direkt im LAN erreichbar sind.

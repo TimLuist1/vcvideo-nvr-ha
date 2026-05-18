@@ -1,14 +1,13 @@
 {
   "domain": "vcvideo_nvr",
   "name": "VCVideo NVR",
-  "icon": "icon.png",
   "version": "1.0.0",
-  "min_homeassistant_version": "2026.5.0",
-  "codeowners": [],
+  "codeowners": ["@TimLuist1"],
   "requirements": [],
-  "dependencies": [],
-  "after_dependencies": ["ffmpeg"],
+  "dependencies": ["ffmpeg"],
   "iot_class": "local_polling",
-  "documentation": "https://github.com/your-repo/vcvideo-nvr-ha",
-  "issue_tracker": "https://github.com/your-repo/vcvideo-nvr-ha/issues"
+  "integration_type": "hub",
+  "config_flow": true,
+  "documentation": "https://github.com/TimLuist1/vcvideo-nvr-ha",
+  "issue_tracker": "https://github.com/TimLuist1/vcvideo-nvr-ha/issues"
 }
