@@ -3,30 +3,26 @@
 from __future__ import annotations
 
 import asyncio
+import datetime
 import logging
 from typing import Any
 
 import aiohttp
-from aiohttp import ClientSession
+from aiohttp import ClientSession, DigestAuthMiddleware
 
 from .const import (
     API_CHANNEL_INFO,
     API_DEVICE_INFO,
     API_HEARTBEAT,
     API_LOGIN,
-    API_LOGIN_RANGE,
     API_LOGOUT,
-    API_STREAM_URL,
-    API_SYSTEM_BASE,
     API_VERSION,
     FIELD_DATA,
     FIELD_ERROR_CODE,
     FIELD_RESULT,
-    FIELD_TOKEN,
     FIELD_VERSION,
     HEADER_TOKEN,
     STREAM_TYPE_MAIN,
-    STREAM_TYPE_SUB,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -52,61 +48,74 @@ class VCVideoNVRClient:
         password: str,
         port: int = 80,
         rtsp_port: int = 554,
-        session: ClientSession | None = None,
     ) -> None:
-        """Initialize the client."""
+        """Initialize the client.
+
+        Note: a dedicated aiohttp ClientSession is created so we can attach the
+        DigestAuthMiddleware and use the cookie jar for the NVR session cookie.
+        """
         self._host = host
         self._port = port
         self._rtsp_port = rtsp_port
         self._username = username
         self._password = password
-        self._session = session
         self._token: str | None = None
-        self._owns_session = session is None
+        self._session: ClientSession | None = None
 
     @property
     def base_url(self) -> str:
-        """Return base URL."""
+        """Return HTTP base URL of the NVR."""
         return f"http://{self._host}:{self._port}"
 
     async def _ensure_session(self) -> ClientSession:
-        """Ensure an aiohttp session exists."""
+        """Lazily create the aiohttp ClientSession with DigestAuthMiddleware."""
         if self._session is None or self._session.closed:
-            self._session = aiohttp.ClientSession()
-            self._owns_session = True
+            middleware = DigestAuthMiddleware(
+                login=self._username, password=self._password
+            )
+            self._session = ClientSession(middlewares=(middleware,))
         return self._session
+
+    @staticmethod
+    def _timestamp() -> str:
+        """Return a cache-busting timestamp string used by the NVR web UI."""
+        return datetime.datetime.now().strftime("%Y-%m-%d@%H:%M:%S")
 
     async def _request(
         self,
-        method: str,
         path: str,
         data: dict | None = None,
-        auth: aiohttp.DigestAuth | None = None,
     ) -> dict:
-        """Make an authenticated request to the NVR API."""
+        """POST a JSON request to the NVR API.
+
+        The NVR API expects:
+          - POST with JSON body {"version": "1.0", "data": {...}}
+          - HTTP Digest auth (handled by the session middleware)
+          - X-csrftoken header on every request after login
+          - Session cookie (handled automatically by the aiohttp cookie jar)
+        """
         session = await self._ensure_session()
         url = f"{self.base_url}{path}?{self._timestamp()}"
         headers: dict[str, str] = {"Content-Type": "application/json"}
         if self._token:
             headers[HEADER_TOKEN] = self._token
 
-        body: dict[str, Any] = {}
-        if data is not None:
-            body = {FIELD_VERSION: API_VERSION, FIELD_DATA: data}
+        body = {FIELD_VERSION: API_VERSION, FIELD_DATA: data or {}}
 
         try:
-            async with session.request(
-                method,
+            async with session.post(
                 url,
-                json=body if body else None,
+                json=body,
                 headers=headers,
-                auth=auth,
                 timeout=aiohttp.ClientTimeout(total=REQUEST_TIMEOUT),
-                ssl=False,
             ) as response:
                 if response.status == 401:
                     raise VCVideoAuthError("Authentication failed (401)")
                 response.raise_for_status()
+                # The NVR may rotate the CSRF token; pick up new one if present.
+                new_token = response.headers.get(HEADER_TOKEN)
+                if new_token:
+                    self._token = new_token
                 return await response.json(content_type=None)
         except aiohttp.ClientConnectorError as err:
             raise VCVideoConnectionError(f"Cannot connect to {self._host}") from err
@@ -115,14 +124,18 @@ class VCVideoNVRClient:
         except asyncio.TimeoutError as err:
             raise VCVideoConnectionError(f"Timeout connecting to {self._host}") from err
 
-    def _timestamp(self) -> str:
-        """Return a cache-busting timestamp string."""
-        import datetime
-        return datetime.datetime.now().strftime("%Y-%m-%d@%H:%M:%S")
-
     async def async_login(self) -> None:
-        """Authenticate with the NVR and store the CSRF token."""
-        auth = aiohttp.DigestAuth(self._username, self._password)
+        """Authenticate with the NVR and store the CSRF token.
+
+        The NVR returns the CSRF token in the response header `X-csrftoken`
+        (NOT in the JSON body). A session cookie is also set.
+        """
+        session = await self._ensure_session()
+        # Clear any stale session cookies before login.
+        session.cookie_jar.clear()
+        self._token = None
+
+        url = f"{self.base_url}{API_LOGIN}?{self._timestamp()}"
         payload = {
             FIELD_VERSION: API_VERSION,
             FIELD_DATA: {
@@ -130,19 +143,17 @@ class VCVideoNVRClient:
                 "PassWord": self._password,
             },
         }
-        session = await self._ensure_session()
-        url = f"{self.base_url}{API_LOGIN}?{self._timestamp()}"
         try:
             async with session.post(
                 url,
                 json=payload,
-                auth=auth,
+                headers={"Content-Type": "application/json"},
                 timeout=aiohttp.ClientTimeout(total=REQUEST_TIMEOUT),
-                ssl=False,
             ) as response:
                 if response.status == 401:
                     raise VCVideoAuthError("Invalid credentials")
                 response.raise_for_status()
+                self._token = response.headers.get(HEADER_TOKEN)
                 result = await response.json(content_type=None)
         except aiohttp.ClientConnectorError as err:
             raise VCVideoConnectionError(f"Cannot connect to {self._host}") from err
@@ -153,81 +164,70 @@ class VCVideoNVRClient:
             error = result.get(FIELD_ERROR_CODE, "unknown")
             raise VCVideoAuthError(f"Login failed: {error}")
 
-        data = result.get(FIELD_DATA, {})
-        self._token = data.get(FIELD_TOKEN)
-        _LOGGER.debug("Logged in to NVR at %s, token: %s", self._host, bool(self._token))
+        if not self._token:
+            raise VCVideoAuthError("Login succeeded but no X-csrftoken header returned")
+
+        _LOGGER.debug("Logged in to NVR at %s", self._host)
 
     async def async_logout(self) -> None:
-        """Logout from the NVR."""
+        """Logout from the NVR (best-effort)."""
         try:
-            await self._request("POST", API_LOGOUT, data={})
+            await self._request(API_LOGOUT, data={})
         except Exception:  # noqa: BLE001
             pass
         self._token = None
 
     async def async_heartbeat(self) -> bool:
-        """Send heartbeat to keep session alive. Returns False if re-login needed."""
+        """Send heartbeat. Returns False if session is no longer valid."""
         try:
-            result = await self._request("POST", API_HEARTBEAT, data={})
+            result = await self._request(API_HEARTBEAT, data={})
             return result.get(FIELD_RESULT) == "success"
         except VCVideoAuthError:
             return False
+        except VCVideoConnectionError:
+            return True  # transient — don't force re-login
 
     async def async_get_device_info(self) -> dict:
-        """Get NVR device information."""
-        result = await self._request("POST", API_DEVICE_INFO, data={})
+        """Return NVR device information."""
+        result = await self._request(API_DEVICE_INFO, data={})
         return result.get(FIELD_DATA, {})
 
     async def async_get_channel_info(self) -> list[dict]:
-        """Get list of camera channels."""
-        result = await self._request("POST", API_CHANNEL_INFO, data={})
+        """Return list of camera channels."""
+        result = await self._request(API_CHANNEL_INFO, data={})
         data = result.get(FIELD_DATA, {})
         channel_param = data.get("channel_param", {})
-        items = channel_param.get("items", [])
-        return items
+        return channel_param.get("items", [])
 
-    async def async_get_stream_url(
-        self, channel: str, stream_type: int = STREAM_TYPE_MAIN
-    ) -> str | None:
-        """Get RTSP stream URL for a channel."""
-        try:
-            result = await self._request(
-                "POST",
-                API_STREAM_URL,
-                data={"channel": channel, "stream_type": stream_type},
-            )
-            data = result.get(FIELD_DATA, {})
-            return data.get("url") or data.get("rtsp_url") or data.get("stream_url")
-        except Exception as err:  # noqa: BLE001
-            _LOGGER.debug("Could not get stream URL via API for %s: %s", channel, err)
-            return None
+    def build_rtsp_url(
+        self, channel_no: int, stream_type: int = STREAM_TYPE_MAIN
+    ) -> str:
+        """Construct an RTSP URL for a channel.
 
-    def build_rtsp_url(self, channel_no: int, stream_type: int = STREAM_TYPE_MAIN) -> str:
-        """Build a standard RTSP URL for the channel (fallback if API fails)."""
-        stream_name = "main" if stream_type == STREAM_TYPE_MAIN else "sub"
-        ch = str(channel_no).zfill(2)
+        Pattern verified against the NVR's RTSP server (`Surveillance Server`):
+            rtsp://user:pass@host:554/chNN/0   (main stream)
+            rtsp://user:pass@host:554/chNN/1   (sub stream)
+        """
         return (
             f"rtsp://{self._username}:{self._password}"
-            f"@{self._host}:{self._rtsp_port}/stream/{ch}/{stream_name}"
+            f"@{self._host}:{self._rtsp_port}/ch{channel_no:02d}/{stream_type}"
         )
 
     async def async_get_snapshot(self, channel: str) -> bytes | None:
-        """Get a snapshot image from a channel."""
+        """Fetch a still image from the channel (best-effort)."""
+        session = await self._ensure_session()
+        url = (
+            f"{self.base_url}/cgi-bin/snapshot.cgi"
+            f"?channel={channel}&{self._timestamp()}"
+        )
+        headers: dict[str, str] = {}
+        if self._token:
+            headers[HEADER_TOKEN] = self._token
         try:
-            session = await self._ensure_session()
-            url = (
-                f"{self.base_url}/cgi-bin/snapshot.cgi"
-                f"?channel={channel}&{self._timestamp()}"
-            )
-            headers: dict[str, str] = {}
-            if self._token:
-                headers[HEADER_TOKEN] = self._token
             async with session.get(
                 url,
                 headers=headers,
-                auth=aiohttp.DigestAuth(self._username, self._password),
                 timeout=aiohttp.ClientTimeout(total=REQUEST_TIMEOUT),
-                ssl=False,
             ) as response:
                 if response.status == 200:
                     ct = response.headers.get("Content-Type", "")
@@ -238,6 +238,8 @@ class VCVideoNVRClient:
         return None
 
     async def async_close(self) -> None:
-        """Close the client session."""
-        if self._owns_session and self._session and not self._session.closed:
+        """Close the underlying aiohttp ClientSession."""
+        if self._session and not self._session.closed:
             await self._session.close()
+        self._session = None
+

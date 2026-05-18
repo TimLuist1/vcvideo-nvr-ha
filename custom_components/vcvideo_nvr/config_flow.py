@@ -10,7 +10,6 @@ import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_PORT, CONF_USERNAME
 from homeassistant.data_entry_flow import FlowResult
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import VCVideoAuthError, VCVideoConnectionError, VCVideoNVRClient
 from .const import CONF_RTSP_PORT, DEFAULT_PORT, DEFAULT_RTSP_PORT, DOMAIN
@@ -49,14 +48,12 @@ class VCVideoNVRConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             await self.async_set_unique_id(f"{host}:{port}")
             self._abort_if_unique_id_configured()
 
-            session = async_get_clientsession(self.hass)
             client = VCVideoNVRClient(
                 host=host,
                 username=username,
                 password=password,
                 port=port,
                 rtsp_port=rtsp_port,
-                session=session,
             )
 
             try:
@@ -71,10 +68,12 @@ class VCVideoNVRConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 errors["base"] = "unknown"
             else:
                 title = device_info.get("device_name") or device_info.get("sn") or host
+                await client.async_close()
                 return self.async_create_entry(
                     title=title,
                     data=user_input,
                 )
+            await client.async_close()
 
         return self.async_show_form(
             step_id="user",

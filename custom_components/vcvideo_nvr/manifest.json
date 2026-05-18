@@ -1,10 +1,11 @@
 {
   "domain": "vcvideo_nvr",
   "name": "VCVideo NVR",
-  "version": "1.0.0",
-  "codeowners": ["@TimLuist1"],
+  "version": "1.0.1",
+  "codeowners": [
+    "@TimLuist1"
+  ],
   "requirements": [],
-  "dependencies": ["ffmpeg"],
   "iot_class": "local_polling",
   "integration_type": "hub",
   "config_flow": true,

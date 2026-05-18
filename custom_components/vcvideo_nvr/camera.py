@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 
 from homeassistant.components.camera import Camera, CameraEntityFeature
@@ -14,10 +15,8 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
-    DEFAULT_RTSP_PORT,
     DOMAIN,
     MANUFACTURER,
-    CONF_RTSP_PORT,
     STATUS_ONLINE,
     STREAM_TYPE_MAIN,
     STREAM_TYPE_SUB,
@@ -25,6 +24,19 @@ from .const import (
 from .coordinator import VCVideoCoordinator
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _channel_to_number(channel_id: str, fallback: int) -> int:
+    """Extract a numeric channel number from IDs like 'IP_CH1', '01', 'CH3'."""
+    if not channel_id:
+        return fallback
+    m = re.search(r"(\d+)", str(channel_id))
+    if m:
+        try:
+            return int(m.group(1))
+        except ValueError:
+            pass
+    return fallback
 
 
 async def async_setup_entry(
@@ -36,17 +48,19 @@ async def async_setup_entry(
     coordinator: VCVideoCoordinator = hass.data[DOMAIN][entry.entry_id]
     channels: list[dict] = coordinator.data or []
 
-    entities = []
+    entities: list[VCVideoCamera] = []
     for idx, channel in enumerate(channels):
-        channel_id = channel.get("channel") or channel.get("channel_no") or str(idx + 1)
+        channel_id = channel.get("channel") or channel.get("channel_no") or f"CH{idx + 1}"
         name = (
-            channel.get("channel_name")
+            channel.get("channel_alias")
+            or channel.get("channel_name")
             or channel.get("name")
             or f"Camera {channel_id}"
         )
         connect_status = (channel.get("connect_status") or "").lower()
         # Skip totally unconfigured channels
-        if connect_status in ("not_configured", "notconfigured"):
+        if connect_status in ("not_configured", "notconfigured", "noconfig"):
+            _LOGGER.debug("Skipping unconfigured channel %s", channel_id)
             continue
 
         entities.append(
@@ -55,11 +69,12 @@ async def async_setup_entry(
                 entry=entry,
                 channel_index=idx,
                 channel_id=str(channel_id),
-                channel_name=name,
+                channel_no=_channel_to_number(str(channel_id), idx + 1),
+                channel_name=str(name).strip() or f"Camera {channel_id}",
             )
         )
-        _LOGGER.debug("Adding camera entity: %s (channel %s)", name, channel_id)
 
+    _LOGGER.info("Adding %d VCVideo NVR cameras", len(entities))
     async_add_entities(entities)
 
 
@@ -75,6 +90,7 @@ class VCVideoCamera(CoordinatorEntity[VCVideoCoordinator], Camera):
         entry: ConfigEntry,
         channel_index: int,
         channel_id: str,
+        channel_no: int,
         channel_name: str,
     ) -> None:
         """Initialize the camera entity."""
@@ -82,12 +98,18 @@ class VCVideoCamera(CoordinatorEntity[VCVideoCoordinator], Camera):
         Camera.__init__(self)
         self._channel_index = channel_index
         self._channel_id = channel_id
+        self._channel_no = channel_no
         self._channel_name = channel_name
         self._entry = entry
-        self._rtsp_url: str | None = None
-        self._rtsp_sub_url: str | None = None
         self._attr_unique_id = f"{entry.entry_id}_camera_{channel_id}"
         self._attr_name = channel_name
+        # Precompute RTSP URLs — the pattern is deterministic for this NVR.
+        self._rtsp_url = coordinator.client.build_rtsp_url(
+            channel_no, STREAM_TYPE_MAIN
+        )
+        self._rtsp_sub_url = coordinator.client.build_rtsp_url(
+            channel_no, STREAM_TYPE_SUB
+        )
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -128,61 +150,19 @@ class VCVideoCamera(CoordinatorEntity[VCVideoCoordinator], Camera):
         ch = self._channel_data
         return {
             "channel_id": self._channel_id,
+            "channel_no": self._channel_no,
             "connect_status": ch.get("connect_status"),
-            "channel_type": ch.get("channel_type") or ch.get("type"),
             "ability": ch.get("ability"),
+            "sub_stream_url": self._rtsp_sub_url,
         }
-
-    async def async_added_to_hass(self) -> None:
-        """Called when entity is added to HA — resolve stream URLs."""
-        await super().async_added_to_hass()
-        await self._async_resolve_stream_url()
-
-    async def _async_resolve_stream_url(self) -> None:
-        """Try to get stream URL via API, fall back to constructed RTSP URL."""
-        client = self.coordinator.client
-        # Try API first
-        url = await client.async_get_stream_url(self._channel_id, STREAM_TYPE_MAIN)
-        if url:
-            self._rtsp_url = url
-        else:
-            # Build standard RTSP URL
-            try:
-                ch_int = int(self._channel_id.lstrip("0") or "0")
-            except ValueError:
-                ch_int = self._channel_index + 1
-            self._rtsp_url = client.build_rtsp_url(ch_int, STREAM_TYPE_MAIN)
-
-        # Sub-stream
-        sub_url = await client.async_get_stream_url(self._channel_id, STREAM_TYPE_SUB)
-        if sub_url:
-            self._rtsp_sub_url = sub_url
-        else:
-            try:
-                ch_int = int(self._channel_id.lstrip("0") or "0")
-            except ValueError:
-                ch_int = self._channel_index + 1
-            self._rtsp_sub_url = client.build_rtsp_url(ch_int, STREAM_TYPE_SUB)
-
-        _LOGGER.debug(
-            "Camera %s main stream: %s",
-            self._channel_name,
-            self._rtsp_url,
-        )
 
     async def stream_source(self) -> str | None:
         """Return RTSP stream URL (used by HA Streams/WebRTC)."""
-        if not self._rtsp_url:
-            await self._async_resolve_stream_url()
         return self._rtsp_url
 
     async def async_camera_image(
         self, width: int | None = None, height: int | None = None
     ) -> bytes | None:
         """Return a still image from the camera."""
-        image = await self.coordinator.client.async_get_snapshot(self._channel_id)
-        return image
+        return await self.coordinator.client.async_get_snapshot(self._channel_id)
 
-    def _handle_coordinator_update(self) -> None:
-        """Handle coordinator data updates."""
-        super()._handle_coordinator_update()

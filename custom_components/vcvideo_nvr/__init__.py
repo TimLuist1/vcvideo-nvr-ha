@@ -7,9 +7,9 @@ import logging
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_PORT, CONF_USERNAME, Platform
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 
-from .api import VCVideoNVRClient
+from .api import VCVideoAuthError, VCVideoConnectionError, VCVideoNVRClient
 from .const import CONF_RTSP_PORT, DEFAULT_PORT, DEFAULT_RTSP_PORT, DOMAIN
 from .coordinator import VCVideoCoordinator
 
@@ -26,25 +26,33 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     username = entry.data[CONF_USERNAME]
     password = entry.data[CONF_PASSWORD]
 
-    session = async_get_clientsession(hass)
+    # NOTE: we deliberately do NOT use HA's shared aiohttp ClientSession because
+    # we need to attach DigestAuthMiddleware at session level for the NVR.
     client = VCVideoNVRClient(
         host=host,
         username=username,
         password=password,
         port=port,
         rtsp_port=rtsp_port,
-        session=session,
     )
 
     coordinator = VCVideoCoordinator(hass, client)
 
     try:
         await coordinator.async_login_and_fetch()
+    except VCVideoAuthError as err:
+        await client.async_close()
+        raise ConfigEntryAuthFailed(f"Invalid credentials for {host}: {err}") from err
+    except VCVideoConnectionError as err:
+        await client.async_close()
+        raise ConfigEntryNotReady(f"Cannot connect to NVR at {host}: {err}") from err
     except Exception as err:
-        _LOGGER.error("Failed to connect to VCVideo NVR at %s: %s", host, err)
-        return False
+        await client.async_close()
+        _LOGGER.exception("Unexpected error setting up VCVideo NVR at %s", host)
+        raise ConfigEntryNotReady(f"Unexpected error: {err}") from err
 
-    await coordinator.async_refresh()
+    # Seed coordinator.data so platforms see channels immediately.
+    coordinator.async_set_updated_data(await client.async_get_channel_info())
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
 
@@ -65,3 +73,4 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Handle options update."""
     await hass.config_entries.async_reload(entry.entry_id)
+
