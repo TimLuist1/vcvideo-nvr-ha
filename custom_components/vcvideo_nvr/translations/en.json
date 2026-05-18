@@ -1,0 +1,25 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Set up VCVideo NVR",
+        "description": "Connect Home Assistant to your VCVideo NVR to expose all camera channels as entities.",
+        "data": {
+          "host": "IP Address / Hostname",
+          "port": "HTTP Port (default: 80)",
+          "rtsp_port": "RTSP Port (default: 554)",
+          "username": "Username",
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to the NVR. Check IP address and port.",
+      "invalid_auth": "Invalid credentials. Check username and password.",
+      "unknown": "Unexpected error."
+    },
+    "abort": {
+      "already_configured": "This device is already configured."
+    }
+  }
+}

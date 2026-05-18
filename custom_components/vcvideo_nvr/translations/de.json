@@ -1,0 +1,25 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "VCVideo NVR einrichten",
+        "description": "Verbindet Home Assistant mit deinem VCVideo NVR und erstellt Kamera-Entitäten für alle Kanäle.",
+        "data": {
+          "host": "IP-Adresse / Hostname",
+          "port": "HTTP-Port (Standard: 80)",
+          "rtsp_port": "RTSP-Port (Standard: 554)",
+          "username": "Benutzername",
+          "password": "Passwort"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Verbindung zum NVR fehlgeschlagen. Prüfe IP-Adresse und Port.",
+      "invalid_auth": "Ungültige Anmeldedaten. Prüfe Benutzername und Passwort.",
+      "unknown": "Unbekannter Fehler."
+    },
+    "abort": {
+      "already_configured": "Dieses Gerät ist bereits eingerichtet."
+    }
+  }
+}
