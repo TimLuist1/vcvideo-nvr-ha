@@ -5,21 +5,70 @@
         "title": "Set up VCVideo NVR",
         "description": "Connect Home Assistant to your VCVideo NVR to expose all camera channels as entities.",
         "data": {
-          "host": "IP Address / Hostname",
-          "port": "HTTP Port (default: 80)",
-          "rtsp_port": "RTSP Port (default: 554)",
+          "host": "IP address / hostname",
+          "port": "HTTP port",
+          "rtsp_port": "RTSP port",
+          "username": "Username",
+          "password": "Password"
+        }
+      },
+      "reconfigure": {
+        "title": "Reconfigure VCVideo NVR",
+        "description": "Update the connection details of your VCVideo NVR.",
+        "data": {
+          "host": "IP address / hostname",
+          "port": "HTTP port",
+          "rtsp_port": "RTSP port",
+          "username": "Username",
+          "password": "Password"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Re-authenticate with the NVR",
+        "description": "The credentials for {host} are no longer accepted. Please enter them again.",
+        "data": {
           "username": "Username",
           "password": "Password"
         }
       }
     },
     "error": {
-      "cannot_connect": "Failed to connect to the NVR. Check IP address and port.",
+      "cannot_connect": "Failed to connect to the NVR. Check the IP address and port.",
       "invalid_auth": "Invalid credentials. Check username and password.",
       "unknown": "Unexpected error."
     },
     "abort": {
-      "already_configured": "This device is already configured."
+      "already_configured": "This device is already configured.",
+      "reauth_successful": "Re-authentication was successful.",
+      "reconfigure_successful": "Reconfiguration was successful.",
+      "wrong_device": "The entered address belongs to a different NVR."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "VCVideo NVR options",
+        "description": "Control how camera thumbnails (still images) are produced.",
+        "data": {
+          "snapshot_source": "Thumbnail source",
+          "ffmpeg_arguments": "FFmpeg input arguments"
+        },
+        "data_description": {
+          "snapshot_source": "Most NVRs of this family offer no still-image endpoint, so thumbnails are grabbed from the RTSP stream. Leave this on automatic unless the thumbnails stay empty.",
+          "ffmpeg_arguments": "Input options passed to FFmpeg when grabbing a frame, for example -rtsp_transport tcp. Clear this field to let FFmpeg pick the transport."
+        }
+      }
+    }
+  },
+  "selector": {
+    "snapshot_source": {
+      "options": {
+        "auto": "Automatic (recommended)",
+        "rtsp_sub": "Frame from the sub stream",
+        "rtsp_main": "Frame from the main stream",
+        "http": "HTTP snapshot from the NVR",
+        "none": "No thumbnails"
+      }
     }
   }
 }

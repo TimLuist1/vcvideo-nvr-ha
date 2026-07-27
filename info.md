@@ -9,9 +9,9 @@ Alle Kanäle deines NVR werden automatisch als `camera`-Entitäten in Home Assis
 ## Features
 - 🔍 Automatische Erkennung aller Kanäle
 - 📹 RTSP Live-Streams (Haupt- & Substream)
-- 📸 Snapshot-Bilder
+- 📸 Vorschaubilder – auch wenn der NVR keinen Snapshot-Endpunkt hat (Einzelbild via FFmpeg)
 - 🟢 Online/Offline Status
-- 💗 Session-Heartbeat
+- 💗 Session-Heartbeat inkl. erneuter Anmeldung
 - 🛠️ Einrichtung komplett über die HA-UI
 - 🇩🇪 Deutsch & 🇬🇧 Englisch
 
@@ -19,6 +19,9 @@ Alle Kanäle deines NVR werden automatisch als `camera`-Entitäten in Home Assis
 **Einstellungen → Geräte & Dienste → Integration hinzufügen → VCVideo NVR**
 
 Eingeben: IP-Adresse des NVR, Benutzername, Passwort.
+
+Über **Konfigurieren** lässt sich einstellen, woher die Vorschaubilder kommen
+(automatisch, Substream, Hauptstream, HTTP-Snapshot oder aus).
 
 ## Kompatibel mit Home Assistant
 ✅ Getestet mit Home Assistant **2026.5.x**  

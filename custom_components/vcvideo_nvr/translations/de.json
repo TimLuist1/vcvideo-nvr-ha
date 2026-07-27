@@ -11,6 +11,25 @@
           "username": "Benutzername",
           "password": "Passwort"
         }
+      },
+      "reconfigure": {
+        "title": "VCVideo NVR neu konfigurieren",
+        "description": "Aktualisiere die Verbindungsdaten deines VCVideo NVR.",
+        "data": {
+          "host": "IP-Adresse / Hostname",
+          "port": "HTTP-Port (Standard: 80)",
+          "rtsp_port": "RTSP-Port (Standard: 554)",
+          "username": "Benutzername",
+          "password": "Passwort"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Erneut am NVR anmelden",
+        "description": "Die Anmeldedaten für {host} werden nicht mehr akzeptiert. Bitte gib sie erneut ein.",
+        "data": {
+          "username": "Benutzername",
+          "password": "Passwort"
+        }
       }
     },
     "error": {
@@ -19,7 +38,37 @@
       "unknown": "Unbekannter Fehler."
     },
     "abort": {
-      "already_configured": "Dieses Gerät ist bereits eingerichtet."
+      "already_configured": "Dieses Gerät ist bereits eingerichtet.",
+      "reauth_successful": "Erneute Anmeldung erfolgreich.",
+      "reconfigure_successful": "Neukonfiguration erfolgreich.",
+      "wrong_device": "Die eingegebene Adresse gehört zu einem anderen NVR."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "VCVideo NVR Optionen",
+        "description": "Legt fest, wie die Vorschaubilder (Standbilder) der Kameras erzeugt werden.",
+        "data": {
+          "snapshot_source": "Quelle für Vorschaubilder",
+          "ffmpeg_arguments": "FFmpeg-Eingabeoptionen"
+        },
+        "data_description": {
+          "snapshot_source": "Die meisten NVR dieser Baureihe bieten keinen Standbild-Endpunkt, daher werden Vorschaubilder aus dem RTSP-Stream geholt. Belasse die Einstellung auf automatisch, solange die Vorschaubilder angezeigt werden.",
+          "ffmpeg_arguments": "Eingabeoptionen für FFmpeg beim Abgreifen eines Einzelbildes, zum Beispiel -rtsp_transport tcp. Feld leeren, damit FFmpeg den Transport selbst wählt."
+        }
+      }
+    }
+  },
+  "selector": {
+    "snapshot_source": {
+      "options": {
+        "auto": "Automatisch (empfohlen)",
+        "rtsp_sub": "Einzelbild aus dem Substream",
+        "rtsp_main": "Einzelbild aus dem Hauptstream",
+        "http": "HTTP-Snapshot vom NVR",
+        "none": "Keine Vorschaubilder"
+      }
     }
   }
 }

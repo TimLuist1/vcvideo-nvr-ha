@@ -23,9 +23,10 @@ Alle Kamera-Kanäle des NVR werden automatisch als `camera`-Entitäten in Home A
 
 - Automatische Erkennung aller Kanäle nach dem Login  
 - Live-Stream via RTSP (Hauptstream + Substream)  
-- Snapshot-Bilder direkt aus HA  
+- Vorschaubilder auch ohne Snapshot-Endpunkt am NVR (Einzelbild via FFmpeg)  
 - Online-/Offline-Status der Kameras  
 - Session-Heartbeat damit die Verbindung stabil bleibt  
+- Erneute Anmeldung, wenn der NVR die Sitzung verwirft  
 - Vollständig konfigurierbar über die UI (kein YAML nötig)  
 - Deutsch und Englisch unterstützt  
 
@@ -73,17 +74,48 @@ Alle Anfragen nach dem Login benötigen den Header `X-csrftoken: <token>`.
 
 ## RTSP-Stream-URLs
 
-Falls die API keinen Stream-URL zurückgibt, werden folgende Fallback-URLs verwendet:
+Die Stream-URLs werden nach folgendem Muster gebildet (`NN` = zweistellige Kanalnummer):
 
 ```
-Hauptstream: rtsp://<user>:<pass>@<host>:554/stream/<CH>/main
-Substream:   rtsp://<user>:<pass>@<host>:554/stream/<CH>/sub
+Hauptstream: rtsp://<user>:<pass>@<host>:554/chNN/0
+Substream:   rtsp://<user>:<pass>@<host>:554/chNN/1
 ```
+
+Benutzername und Passwort werden dabei URL-kodiert, Sonderzeichen wie `@` oder `:`
+im Passwort sind also kein Problem.
+
+---
+
+## Vorschaubilder (Thumbnails)
+
+Die meisten NVR dieser Baureihe besitzen **keinen HTTP-Endpunkt für Standbilder**.
+Deshalb blieb das Vorschaubild in Home Assistant leer, obwohl der Live-Stream lief.
+
+Ab Version 1.1.0 ermittelt die Integration einmalig im Hintergrund, ob der NVR
+einen Snapshot-Endpunkt anbietet. Ist keiner vorhanden, wird das Vorschaubild
+mit **FFmpeg** als Einzelbild aus dem RTSP-Substream geholt. Die Bilder werden
+kurz zwischengespeichert, damit ein Dashboard mit vielen Kameras nicht für jede
+Karte einen eigenen FFmpeg-Prozess startet.
+
+Über **Einstellungen → Geräte & Dienste → VCVideo NVR → Konfigurieren** lässt
+sich das Verhalten anpassen:
+
+| Option | Bedeutung |
+|---|---|
+| Automatisch | HTTP-Snapshot, wenn der NVR einen anbietet, sonst Einzelbild aus dem Substream (Standard) |
+| Einzelbild aus dem Substream | Immer FFmpeg auf dem Substream – schnell und ressourcenschonend |
+| Einzelbild aus dem Hauptstream | Immer FFmpeg auf dem Hauptstream – bessere Auflösung, mehr Last |
+| HTTP-Snapshot vom NVR | Nur den HTTP-Endpunkt verwenden |
+| Keine Vorschaubilder | Standbilder komplett deaktivieren |
+
+Zusätzlich lassen sich die FFmpeg-Eingabeoptionen setzen (Standard
+`-rtsp_transport tcp`). Wenn der NVR nur UDP spricht, kann das Feld geleert werden.
 
 ---
 
 ## Anforderungen
 
-- Home Assistant 2023.1.0+  
+- Home Assistant 2026.5.0+  
+- FFmpeg (in Home Assistant OS, Container und Supervised bereits enthalten)  
 - HACS (für einfache Installation)  
 - NVR muss im LAN erreichbar sein  

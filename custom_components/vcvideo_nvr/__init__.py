@@ -36,10 +36,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         rtsp_port=rtsp_port,
     )
 
-    coordinator = VCVideoCoordinator(hass, client)
+    coordinator = VCVideoCoordinator(hass, client, entry)
 
     try:
-        await coordinator.async_login_and_fetch()
+        channels = await coordinator.async_login_and_fetch()
     except VCVideoAuthError as err:
         await client.async_close()
         raise ConfigEntryAuthFailed(f"Invalid credentials for {host}: {err}") from err
@@ -52,7 +52,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         raise ConfigEntryNotReady(f"Unexpected error: {err}") from err
 
     # Seed coordinator.data so platforms see channels immediately.
-    coordinator.async_set_updated_data(await client.async_get_channel_info())
+    coordinator.async_set_updated_data(channels)
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
 
@@ -65,12 +65,16 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unloaded:
-        coordinator: VCVideoCoordinator = hass.data[DOMAIN].pop(entry.entry_id)
-        await coordinator.async_shutdown()
+        coordinator: VCVideoCoordinator | None = hass.data.get(DOMAIN, {}).pop(
+            entry.entry_id, None
+        )
+        if coordinator is not None:
+            await coordinator.async_shutdown()
+        if not hass.data.get(DOMAIN):
+            hass.data.pop(DOMAIN, None)
     return unloaded
 
 
 async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Handle options update."""
     await hass.config_entries.async_reload(entry.entry_id)
-
