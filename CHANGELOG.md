@@ -1,5 +1,24 @@
 # Changelog
 
+## v1.1.1 – Lizenz und Icon
+
+Keine Änderungen am Verhalten der Integration – dieses Release bringt die
+Repository-Metadaten in Ordnung, an denen die HACS-Prüfung seit dem ersten
+Commit gescheitert ist.
+
+- **Lizenz**: Das Projekt steht jetzt unter der **GNU General Public License
+  v3.0**, der vollständige Text liegt in `LICENSE`. Home Assistant selbst ist
+  Apache-2.0-lizenziert und damit mit der GPLv3 verträglich.
+- **Icon**: Neue Brand-Assets unter `custom_components/vcvideo_nvr/brand/`
+  (`icon.png` 256×256, `icon@2x.png` 512×512). Dort sucht HACS zuerst, bevor
+  es auf das `home-assistant/brands`-Repository zurückfällt. Das Icon zeigt
+  einen generischen Rekorder mit Objektiv, Aufnahme-Leuchte und Status-LEDs –
+  es ist **kein Logo von VC Germany** und trägt keinen Schriftzug.
+
+Offen bleibt die HACS-Prüfung *topics*: mindestens ein Repository-Topic muss
+in den Repository-Einstellungen gesetzt werden, das lässt sich nicht aus einem
+Workflow heraus erledigen.
+
 ## v1.1.0 – Vorschaubilder
 
 ### 🖼️ Vorschaubilder werden endlich angezeigt
