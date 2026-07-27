@@ -7,6 +7,7 @@
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
 [![GitHub release](https://img.shields.io/github/v/release/TimLuist1/vcvideo-nvr-ha)](https://github.com/TimLuist1/vcvideo-nvr-ha/releases)
 [![Validate](https://github.com/TimLuist1/vcvideo-nvr-ha/actions/workflows/validate.yml/badge.svg)](https://github.com/TimLuist1/vcvideo-nvr-ha/actions/workflows/validate.yml)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
 [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=TimLuist1&repository=vcvideo-nvr-ha&category=integration)
 
@@ -119,3 +120,27 @@ Zusätzlich lassen sich die FFmpeg-Eingabeoptionen setzen (Standard
 - FFmpeg (in Home Assistant OS, Container und Supervised bereits enthalten)  
 - HACS (für einfache Installation)  
 - NVR muss im LAN erreichbar sein  
+
+---
+
+## Lizenz
+
+Dieses Projekt steht unter der **GNU General Public License v3.0** – der
+vollständige Lizenztext liegt in [LICENSE](LICENSE).
+
+```
+VCVideo NVR – Home Assistant Integration
+Copyright (C) 2026 Tim Luis Techert
+
+Dieses Programm ist freie Software: Sie können es unter den Bedingungen der
+GNU General Public License, Version 3, weitergeben und/oder modifizieren.
+Die Veröffentlichung erfolgt in der Hoffnung, dass es nützlich ist, jedoch
+OHNE JEDE GEWÄHRLEISTUNG.
+```
+
+Home Assistant selbst steht unter der Apache-2.0-Lizenz, die mit der GPLv3
+verträglich ist.
+
+Das Icon der Integration (`custom_components/vcvideo_nvr/brand/icon.png`) ist
+eine eigene, generische Darstellung eines Rekorders und **kein Logo von
+VC Germany**.
